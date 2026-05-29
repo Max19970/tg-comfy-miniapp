@@ -1,4 +1,4 @@
-import { Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 
 export function ProgressPanel({ job, preview, onCancel }) {
   if (!job) return null;
@@ -15,9 +15,10 @@ export function ProgressPanel({ job, preview, onCancel }) {
   }[job.status] || job.status;
 
   const canCancel = ['queued', 'submitting', 'running', 'finalizing'].includes(job.status);
+  const isFinal = ['done', 'failed', 'cancelled'].includes(job.status);
   const nodeLabel = job.currentNodeName || job.currentNode;
   const progress = Math.max(0, Math.min(100, Number(job.progress || 0)));
-  const showPreview = preview?.dataUrl && !['done', 'failed', 'cancelled'].includes(job.status);
+  const showPreview = preview?.dataUrl && !isFinal;
   const showPreviewHint = !preview?.dataUrl && ['running', 'finalizing'].includes(job.status);
 
   return (
@@ -27,7 +28,7 @@ export function ProgressPanel({ job, preview, onCancel }) {
           <img src={preview.dataUrl} alt="Черновик генерации" />
         ) : (
           <div className="stageEmpty">
-            <Loader2 className="spin" size={24} />
+            {isFinal ? <CheckCircle2 size={24} /> : <Loader2 className="spin" size={24} />}
             <span>{showPreviewHint ? 'Жду первые шаги сэмплинга' : label}</span>
           </div>
         )}
@@ -46,7 +47,7 @@ export function ProgressPanel({ job, preview, onCancel }) {
           <div style={{ width: `${progress}%` }} />
         </div>
 
-        {nodeLabel && (
+        {nodeLabel && !isFinal && (
           <p className="muted compactLine">
             Сейчас: {nodeLabel}
             {job.currentNodeName && job.currentNode ? ` · node ${job.currentNode}` : ''}
