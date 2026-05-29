@@ -29,6 +29,7 @@ export function App() {
   const [resources, setResources] = React.useState({ checkpoints: [], loras: [], samplers: [], schedulers: [] });
   const [presets, setPresets] = React.useState([]);
   const [job, setJob] = React.useState(null);
+  const [preview, setPreview] = React.useState(null);
   const [history, setHistory] = React.useState([]);
   const [filters, setFilters] = React.useState({ search: '', status: '', favorite: false });
   const [loading, setLoading] = React.useState(true);
@@ -44,10 +45,12 @@ export function App() {
   const { connect } = useJobSocket({
     initData,
     onError: setError,
+    onPreview: setPreview,
     onJob: (nextJob) => {
       setJob(nextJob);
       if (['done', 'failed', 'cancelled'].includes(nextJob.status)) {
         setBusy(false);
+        setPreview(null);
         loadHistory(filters).catch(() => {});
       }
     }
@@ -117,6 +120,7 @@ export function App() {
     e.preventDefault();
     try {
       setError('');
+      setPreview(null);
       setBusy(true);
       const data = await api.generate(settings);
       setJob(data.job);
@@ -131,6 +135,7 @@ export function App() {
   async function cancelJob(id) {
     try {
       setError('');
+      setPreview(null);
       const data = await api.cancelJob(id);
       setJob(data.job);
       await loadHistory(filters);
@@ -191,7 +196,7 @@ export function App() {
         />
       )}
 
-      {tab === 'generate' && <ProgressPanel job={job} onCancel={cancelJob} />}
+      {tab === 'generate' && <ProgressPanel job={job} preview={preview} onCancel={cancelJob} />}
       {tab === 'generate' && <ImageGrid images={job?.images || []} initData={initData} />}
 
       {tab === 'history' && (
