@@ -25,6 +25,19 @@ function isActiveQuality(settings, mode) {
   return Number(settings.steps) === mode.steps && Number(settings.cfg) === mode.cfg;
 }
 
+function SettingsSection({ title, summary, defaultOpen = false, children }) {
+  return (
+    <details className="settingsSection" open={defaultOpen}>
+      <summary>
+        <span>{title}</span>
+        {summary && <small>{summary}</small>}
+        <ChevronDown size={17} />
+      </summary>
+      <div className="settingsSectionBody">{children}</div>
+    </details>
+  );
+}
+
 export function GenerateForm({ settings, resources, presets, busy, onSubmit, onPatch, onUsePreset, onRefreshResources }) {
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
 
@@ -39,6 +52,7 @@ export function GenerateForm({ settings, resources, presets, busy, onSubmit, onP
   }
 
   const selectedPreset = presets.find((preset) => preset.id === settings.presetId);
+  const loraSummary = settings.loras?.length ? `${settings.loras.length} подключено` : 'Не подключены';
 
   return (
     <form onSubmit={onSubmit} className="composer">
@@ -121,20 +135,21 @@ export function GenerateForm({ settings, resources, presets, busy, onSubmit, onP
 
         {advancedOpen && (
           <div className="advancedBody">
-            <div className="grid2">
-              <Field label="Пресет">
-                <select value="" onChange={(e) => e.target.value && onUsePreset(e.target.value)}>
-                  <option value="">Выбрать пресет</option>
-                  {presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
-                </select>
-              </Field>
-              <Field label="Workflow">
-                <input value={settings.workflowType || 'sd15-text2img'} onChange={(e) => onPatch('workflowType', e.target.value)} />
-              </Field>
-            </div>
+            <SettingsSection title="Профиль" summary={selectedPreset?.name || settings.workflowType || 'sd15-text2img'} defaultOpen>
+              <div className="grid2">
+                <Field label="Пресет">
+                  <select value="" onChange={(e) => e.target.value && onUsePreset(e.target.value)}>
+                    <option value="">Выбрать пресет</option>
+                    {presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Workflow">
+                  <input value={settings.workflowType || 'sd15-text2img'} onChange={(e) => onPatch('workflowType', e.target.value)} />
+                </Field>
+              </div>
+            </SettingsSection>
 
-            <div className="settingsBlock">
-              <h3>Модель</h3>
+            <SettingsSection title="Модель" summary={settings.checkpoint || 'Не выбрана'}>
               <div className="grid2">
                 <Field label="Checkpoint">
                   <Select value={settings.checkpoint} options={resources.checkpoints} onChange={(v) => onPatch('checkpoint', v)} />
@@ -143,10 +158,9 @@ export function GenerateForm({ settings, resources, presets, busy, onSubmit, onP
                   <input type="number" value={settings.seed} onChange={(e) => onPatch('seed', numberValue(e.target.value))} />
                 </Field>
               </div>
-            </div>
+            </SettingsSection>
 
-            <div className="settingsBlock">
-              <h3>Сэмплинг</h3>
+            <SettingsSection title="Сэмплинг" summary={`${settings.steps} steps · CFG ${settings.cfg}`}>
               <div className="grid2">
                 <Field label="Sampler">
                   <Select value={settings.samplerName} options={resources.samplers} onChange={(v) => onPatch('samplerName', v)} />
@@ -167,10 +181,9 @@ export function GenerateForm({ settings, resources, presets, busy, onSubmit, onP
                   <input type="number" min="1" max="8" value={settings.batchSize} onChange={(e) => onPatch('batchSize', numberValue(e.target.value))} />
                 </Field>
               </div>
-            </div>
+            </SettingsSection>
 
-            <div className="settingsBlock">
-              <h3>Размер</h3>
+            <SettingsSection title="Размер" summary={`${settings.width}×${settings.height}`}>
               <div className="grid2">
                 <Field label="Width">
                   <input type="number" min="64" step="8" value={settings.width} onChange={(e) => onPatch('width', numberValue(e.target.value))} />
@@ -179,9 +192,11 @@ export function GenerateForm({ settings, resources, presets, busy, onSubmit, onP
                   <input type="number" min="64" step="8" value={settings.height} onChange={(e) => onPatch('height', numberValue(e.target.value))} />
                 </Field>
               </div>
-            </div>
+            </SettingsSection>
 
-            <LoraEditor loras={settings.loras || []} resources={resources} onChange={(loras) => onPatch('loras', loras)} />
+            <SettingsSection title="LoRA" summary={loraSummary} defaultOpen={Boolean(settings.loras?.length)}>
+              <LoraEditor loras={settings.loras || []} resources={resources} onChange={(loras) => onPatch('loras', loras)} compact />
+            </SettingsSection>
           </div>
         )}
       </section>
