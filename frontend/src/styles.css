@@ -264,7 +264,8 @@ input:focus, textarea:focus, select:focus { border-color: rgba(214, 168, 95, .68
   cursor: pointer;
   list-style: none;
 }
-.negativePrompt summary::-webkit-details-marker { display: none; }
+.negativePrompt summary::-webkit-details-marker,
+.settingsSection summary::-webkit-details-marker { display: none; }
 .negativePrompt textarea { margin-top: 10px; min-height: 82px; }
 
 .quickPanel {
@@ -299,14 +300,44 @@ input:focus, textarea:focus, select:focus { border-color: rgba(214, 168, 95, .68
 }
 .chevron { transition: transform .18s ease; flex: none; }
 .chevron.open { transform: rotate(180deg); }
-.advancedBody { padding: 0 14px 14px; }
+.advancedBody { padding: 0 14px 14px; display: grid; gap: 10px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.settingsBlock {
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-  margin-top: 6px;
+.settingsSection {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(255,255,255,.018);
+  overflow: hidden;
 }
-.settingsBlock h3 { margin: 0 0 12px; font-size: 15px; }
+.settingsSection summary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 10px;
+  align-items: center;
+  padding: 13px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.settingsSection summary span { font-weight: 800; }
+.settingsSection summary small {
+  grid-column: 1 / 2;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settingsSection summary svg {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  color: var(--muted);
+  transition: transform .18s ease;
+}
+.settingsSection[open] summary svg { transform: rotate(180deg); }
+.settingsSectionBody {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--border);
+}
 .submitButton { width: 100%; min-height: 54px; border-radius: 999px; font-size: 16px; }
 
 .sectionTitle {
@@ -322,6 +353,12 @@ input:focus, textarea:focus, select:focus { border-color: rgba(214, 168, 95, .68
   padding-top: 14px;
   margin-top: 6px;
 }
+.loraBox.compact {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 14px;
+}
+.loraBox.compact .sectionTitle { justify-content: flex-start; }
 .loraList { display: grid; gap: 10px; }
 .loraCard {
   position: relative;
@@ -343,7 +380,7 @@ input[type='range'] { padding: 0; accent-color: var(--accent); }
   gap: 12px;
   margin: 14px 0;
 }
-.imageGrid.result { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.imageGrid.result { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 0; }
 .imageCard {
   position: relative;
   display: block;
