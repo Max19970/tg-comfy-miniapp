@@ -17,22 +17,49 @@ export function LoraEditor({ loras = [], resources, onChange }) {
 
   return (
     <section className="loraBox">
-      <div className="sectionTitle"><Settings2 size={18} /><strong>LoRA</strong><button type="button" className="ghost" onClick={addLora}><Plus size={18} /> Добавить</button></div>
+      <div className="sectionTitle">
+        <span><Settings2 size={18} /><strong>LoRA</strong></span>
+        <button type="button" className="ghost smallButton" onClick={addLora}><Plus size={18} /> Добавить</button>
+      </div>
+
       {!loras.length && <p className="muted">LoRA не подключены.</p>}
-      {loras.map((lora, index) => (
-        <div className="loraRow" key={index}>
-          <Field label="Файл LoRA">
-            <Select value={lora.name} options={resources.loras} onChange={(v) => updateLora(index, 'name', v)} placeholder="LoRA" />
-          </Field>
-          <Field label="Model">
-            <input type="number" step="0.05" value={lora.strengthModel} onChange={(e) => updateLora(index, 'strengthModel', numberValue(e.target.value))} />
-          </Field>
-          <Field label="CLIP">
-            <input type="number" step="0.05" value={lora.strengthClip} onChange={(e) => updateLora(index, 'strengthClip', numberValue(e.target.value))} />
-          </Field>
-          <button type="button" className="iconDanger" onClick={() => removeLora(index)} aria-label="Удалить LoRA"><Trash2 size={18} /></button>
-        </div>
-      ))}
+
+      <div className="loraList">
+        {loras.map((lora, index) => (
+          <article className="loraCard" key={index}>
+            <Field label="Файл">
+              <Select value={lora.name} options={resources.loras} onChange={(v) => updateLora(index, 'name', v)} placeholder="Выбрать LoRA" />
+            </Field>
+
+            <div className="loraStrengths">
+              <label>
+                <span>Model {lora.strengthModel}</span>
+                <input
+                  type="range"
+                  min="-2"
+                  max="2"
+                  step="0.05"
+                  value={lora.strengthModel}
+                  onChange={(e) => updateLora(index, 'strengthModel', numberValue(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>CLIP {lora.strengthClip}</span>
+                <input
+                  type="range"
+                  min="-2"
+                  max="2"
+                  step="0.05"
+                  value={lora.strengthClip}
+                  onChange={(e) => updateLora(index, 'strengthClip', numberValue(e.target.value))}
+                />
+              </label>
+            </div>
+
+            <button type="button" className="iconDanger" onClick={() => removeLora(index)} aria-label="Удалить LoRA"><Trash2 size={18} /></button>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

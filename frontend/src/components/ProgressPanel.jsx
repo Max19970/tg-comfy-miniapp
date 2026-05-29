@@ -6,7 +6,7 @@ export function ProgressPanel({ job, preview, onCancel }) {
   const label = {
     queued: 'В очереди',
     submitting: 'Отправляю в ComfyUI',
-    running: 'Генерация',
+    running: 'Рисую',
     finalizing: 'Забираю результат',
     cancelling: 'Отменяю',
     cancelled: 'Отменено',
@@ -16,46 +16,55 @@ export function ProgressPanel({ job, preview, onCancel }) {
 
   const canCancel = ['queued', 'submitting', 'running', 'finalizing'].includes(job.status);
   const nodeLabel = job.currentNodeName || job.currentNode;
+  const progress = Math.max(0, Math.min(100, Number(job.progress || 0)));
   const showPreview = preview?.dataUrl && !['done', 'failed', 'cancelled'].includes(job.status);
   const showPreviewHint = !preview?.dataUrl && ['running', 'finalizing'].includes(job.status);
 
   return (
-    <section className="panel progressPanel">
-      <div className="progressHeader">
-        <strong>{label}{job.queuePosition ? ` #${job.queuePosition}` : ''}</strong>
-        <span>{job.progress || 0}%</span>
+    <section className={`stagePanel ${job.status}`}>
+      <div className="stageFrame">
+        {showPreview ? (
+          <img src={preview.dataUrl} alt="Черновик генерации" />
+        ) : (
+          <div className="stageEmpty">
+            <Loader2 className="spin" size={24} />
+            <span>{showPreviewHint ? 'Жду первые шаги сэмплинга' : label}</span>
+          </div>
+        )}
       </div>
 
-      <div className="progressTrack">
-        <div style={{ width: `${job.progress || 0}%` }} />
-      </div>
-
-      {nodeLabel && (
-        <p className="muted">
-          Сейчас: {nodeLabel}
-          {job.currentNodeName && job.currentNode ? ` · node ${job.currentNode}` : ''}
-        </p>
-      )}
-
-      {showPreview && (
-        <div className="livePreview">
-          <img src={preview.dataUrl} alt="Live generation preview" />
-          <span>Live preview</span>
+      <div className="stageInfo">
+        <div className="stageHeader">
+          <div>
+            <span className="stageKicker">Generation stage</span>
+            <strong>{label}{job.queuePosition ? ` #${job.queuePosition}` : ''}</strong>
+          </div>
+          <span className="stagePercent">{progress}%</span>
         </div>
-      )}
 
-      {showPreviewHint && <p className="muted">Превью появится после первых шагов сэмплинга.</p>}
-      {job.error && <p className="error">{job.error}</p>}
+        <div className="progressTrack" aria-label={`Прогресс ${progress}%`}>
+          <div style={{ width: `${progress}%` }} />
+        </div>
 
-      {canCancel && (
-        <button className="secondary cancelButton" type="button" onClick={() => onCancel?.(job.id)}>
-          <XCircle size={18} /> Отменить
-        </button>
-      )}
+        {nodeLabel && (
+          <p className="muted compactLine">
+            Сейчас: {nodeLabel}
+            {job.currentNodeName && job.currentNode ? ` · node ${job.currentNode}` : ''}
+          </p>
+        )}
 
-      {job.status === 'cancelling' && (
-        <p className="muted"><Loader2 className="spin" size={16} /> Жду, пока сервер остановит задачу.</p>
-      )}
+        {job.error && <p className="error">{job.error}</p>}
+
+        {canCancel && (
+          <button className="secondary cancelButton" type="button" onClick={() => onCancel?.(job.id)}>
+            <XCircle size={18} /> Остановить
+          </button>
+        )}
+
+        {job.status === 'cancelling' && (
+          <p className="muted compactLine"><Loader2 className="spin" size={16} /> Сервер останавливает задачу.</p>
+        )}
+      </div>
     </section>
   );
 }
