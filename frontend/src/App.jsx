@@ -104,6 +104,9 @@ export function App() {
   }, [filters]);
 
   const patch = (key, value) => setSettings((prev) => ({ ...prev, [key]: value }));
+  const resultImages = job?.images || [];
+  const hasResultImages = resultImages.length > 0;
+  const shouldShowStage = job && !(job.status === 'done' && hasResultImages);
 
   async function refreshResources() {
     try {
@@ -197,9 +200,9 @@ export function App() {
 
       {tab === 'generate' && (
         <>
-          {job ? (
+          {shouldShowStage ? (
             <ProgressPanel job={job} preview={preview} onCancel={cancelJob} />
-          ) : (
+          ) : !hasResultImages ? (
             <section className="stagePanel idle">
               <div className="stageFrame">
                 <div className="stageEmpty">
@@ -208,9 +211,9 @@ export function App() {
                 </div>
               </div>
             </section>
-          )}
+          ) : null}
 
-          <ImageGrid images={job?.images || []} initData={initData} variant="result" />
+          <ImageGrid images={resultImages} initData={initData} variant="result" />
 
           <GenerateForm
             settings={settings}
