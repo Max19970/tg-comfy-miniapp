@@ -24,7 +24,9 @@ comfy:
   httpUrl: http://127.0.0.1:8188
   wsUrl: ws://127.0.0.1:8188/ws
   workflowFile: ./workflows/sd15-basic.json
+  defaultWorkflowType: sd15-text2img
   requestTimeoutMs: 120000
+  resourcesCacheTtlMs: 30000
   # Fallback values used if /object_info is unavailable.
   fallback:
     checkpoints:
@@ -45,6 +47,18 @@ comfy:
 storage:
   dataDir: ./backend/data
   maxHistoryPerUser: 200
+  # Progress updates are kept in memory and written to db.json with a tiny debounce.
+  flushDelayMs: 250
+
+jobs:
+  # ComfyUI often behaves best with 1 generation at a time. Increase only if your setup supports it.
+  maxConcurrentGlobal: 1
+  maxQueuePerUser: 3
+  # /interrupt is global in many ComfyUI setups, so keep it off unless this bot is the only Comfy user.
+  allowInterruptRunning: false
+
+presets:
+  file: ./presets/default.json
 
 # Optional Cloudflare Named Tunnel integration.
 # When autoStart is true, npm start also runs cloudflared and stops it on shutdown.

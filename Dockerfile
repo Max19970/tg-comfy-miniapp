@@ -19,6 +19,7 @@ COPY --from=build /app/backend ./backend
 COPY --from=build /app/frontend/dist ./frontend/dist
 COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/workflows ./workflows
+COPY --from=build /app/presets ./presets
 COPY --from=build /app/config.example.yaml ./config.yaml
 
 EXPOSE 8080

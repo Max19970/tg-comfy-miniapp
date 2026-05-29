@@ -1,6 +1,6 @@
 # Telegram ComfyUI Mini App Bot
 
-Готовый Telegram-бот с mini app для генерации изображений через ComfyUI.
+Telegram-бот с mini app для генерации изображений через ComfyUI.
 
 Внутри:
 
@@ -8,9 +8,12 @@
 - Telegram webhook-бот: команда `/start` присылает кнопку mini app.
 - Frontend на React/Vite.
 - Генерация через ComfyUI `/prompt`.
+- Очередь генераций с лимитами на пользователя и глобальной конкурентностью.
 - Прогресс через WebSocket ComfyUI → WebSocket mini app.
-- История генераций с картинками, параметрами и копированием параметров обратно в форму.
+- История генераций с картинками, параметрами, избранным, поиском и копированием параметров обратно в форму.
+- Пресеты генерации из JSON-файла.
 - Checkpoint/sampler/scheduler/LoRA подтягиваются из ComfyUI `/object_info`, если ComfyUI доступен.
+- Workflow-адаптеры: текущая реализация содержит `sd15-text2img`, но структура готова под SDXL/Flux/img2img/upscale.
 - Конфиги для Cloudflare Named Tunnel.
 - Опциональный автостарт `cloudflared` вместе с backend и остановка при завершении Node-процесса.
 
@@ -87,7 +90,128 @@ docker compose up -d --build
 docker compose exec tg-comfy-miniapp npm run set-webhook
 ```
 
-## 4. Cloudflare Named Tunnel
+## 4. Очередь генераций
+
+Параметры очереди лежат в `config.yaml`:
+
+```yaml
+jobs:
+  maxConcurrentGlobal: 1
+  maxQueuePerUser: 3
+  allowInterruptRunning: false
+```
+
+`maxConcurrentGlobal` определяет, сколько генераций backend одновременно отправляет в ComfyUI.
+
+`maxQueuePerUser` ограничивает количество ожидающих задач одного Telegram-пользователя.
+
+`allowInterruptRunning` по умолчанию выключен, потому что ComfyUI `/interrupt` обычно глобальный: он может остановить не только задачу этого mini app, но и чужую ручную генерацию в том же ComfyUI.
+
+## 5. Пресеты
+
+Пресеты лежат в JSON-файле:
+
+```yaml
+presets:
+  file: ./presets/default.json
+```
+
+Формат:
+
+```json
+{
+  "presets": [
+    {
+      "id": "fast-draft",
+      "name": "Быстрый черновик",
+      "description": "Меньше шагов, удобно быстро проверять промпт.",
+      "settings": {
+        "workflowType": "sd15-text2img",
+        "width": 512,
+        "height": 512,
+        "steps": 12,
+        "cfg": 6,
+        "seed": -1
+      }
+    }
+  ]
+}
+```
+
+Настройки пресета накладываются поверх `defaultSettings` backend-а.
+
+## 6. Как работает workflow
+
+По умолчанию используется файл:
+
+```yaml
+comfy:
+  workflowFile: ./workflows/sd15-basic.json
+  defaultWorkflowType: sd15-text2img
+```
+
+Это простой API workflow:
+
+`CheckpointLoaderSimple → CLIPTextEncode → EmptyLatentImage → KSampler → VAEDecode → SaveImage`
+
+LoRA добавляются динамически через `LoraLoader` между checkpoint и CLIP/KSampler.
+
+Текущий адаптер `sd15-text2img` ожидает наличие этих node-классов:
+
+- `CheckpointLoaderSimple`
+- `CLIPTextEncode` — два узла: positive и negative
+- `EmptyLatentImage`
+- `KSampler`
+- `SaveImage`
+
+Для SDXL, Flux, img2img, inpaint, upscale или ControlNet добавляй новый адаптер в `backend/src/comfy/workflows/` и регистрируй его в `backend/src/comfy/workflowBuilder.js`.
+
+## 7. Авторизация Telegram Mini App
+
+Все API-запросы mini app отправляют заголовок:
+
+```http
+X-Telegram-Init-Data: <Telegram.WebApp.initData>
+```
+
+Backend валидирует подпись `initData` через bot token. Для локальной отладки можно временно поставить:
+
+```yaml
+telegram:
+  enforceAuth: false
+```
+
+Не оставляй это в проде.
+
+Новые изображения отдаются через авторизованный endpoint `/api/history/:id/images/:filename`. Старый `/generated` оставлен только для обратной совместимости с уже сохранённой историей.
+
+## 8. Ограничение доступа
+
+Можно разрешить только конкретные Telegram user ID:
+
+```yaml
+telegram:
+  allowedUserIds:
+    - 123456789
+    - 987654321
+```
+
+Пустой список означает: разрешён любой пользователь, который открыл mini app через бота.
+
+## 9. Где лежит история
+
+История и скачанные результаты сохраняются здесь:
+
+```text
+backend/data/db.json
+backend/data/generated/
+```
+
+Backend держит актуальное состояние в памяти и пишет `db.json` с небольшим debounce, чтобы progress-события не долбили файл на каждый процент.
+
+Для более серьёзного продакшена следующий естественный шаг — заменить `JsonGenerationRepository` на SQLite-репозиторий с тем же интерфейсом.
+
+## 10. Cloudflare Named Tunnel
 
 Локальный вариант:
 
@@ -148,71 +272,7 @@ cp cloudflared/config.docker.yml.example cloudflared/config.yml
 
 И раскомментируй сервис `cloudflared` в `docker-compose.yml`. Для Docker обычно не нужно включать `cloudflare.autoStart`, потому что tunnel лучше держать отдельным сервисом compose.
 
-## 5. Как работает workflow
-
-По умолчанию используется файл:
-
-```yaml
-comfy:
-  workflowFile: ./workflows/sd15-basic.json
-```
-
-Это простой API workflow:
-
-`CheckpointLoaderSimple → CLIPTextEncode → EmptyLatentImage → KSampler → VAEDecode → SaveImage`
-
-LoRA добавляются динамически через `LoraLoader` между checkpoint и CLIP/KSampler.
-
-Если у тебя SDXL, Flux или кастомный workflow, можно заменить `workflowFile`, но в текущей версии backend ожидает наличие этих node-классов:
-
-- `CheckpointLoaderSimple`
-- `CLIPTextEncode` — два узла: positive и negative
-- `EmptyLatentImage`
-- `KSampler`
-- `SaveImage`
-
-## 6. Авторизация Telegram Mini App
-
-Все API-запросы mini app отправляют заголовок:
-
-```http
-X-Telegram-Init-Data: <Telegram.WebApp.initData>
-```
-
-Backend валидирует подпись `initData` через bot token. Для локальной отладки можно временно поставить:
-
-```yaml
-telegram:
-  enforceAuth: false
-```
-
-Не оставляй это в проде.
-
-## 7. Ограничение доступа
-
-Можно разрешить только конкретные Telegram user ID:
-
-```yaml
-telegram:
-  allowedUserIds:
-    - 123456789
-    - 987654321
-```
-
-Пустой список означает: разрешён любой пользователь, который открыл mini app через бота.
-
-## 8. Где лежит история
-
-История и скачанные результаты сохраняются здесь:
-
-```text
-backend/data/db.json
-backend/data/generated/
-```
-
-Картинки проксируются и сохраняются локально, поэтому история не исчезает сразу после очистки ComfyUI output.
-
-## 9. Частые проблемы
+## 11. Частые проблемы
 
 ### Telegram не открывает mini app
 
@@ -230,7 +290,7 @@ Backend пытается прочитать `/object_info` у ComfyUI. Если 
 
 Имя checkpoint в форме должно совпадать с файлом в ComfyUI. Открой `/api/comfy/resources` после авторизации или посмотри список в mini app.
 
-## 10. Быстрая диагностика, если бот молчит
+## 12. Быстрая диагностика, если бот молчит
 
 Важно: этот бот работает через Telegram webhook, не через long polling. Поэтому `npm start` только запускает backend; после этого webhook должен быть установлен командой:
 

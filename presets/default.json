@@ -1,0 +1,60 @@
+{
+  "presets": [
+    {
+      "id": "fast-draft",
+      "name": "Быстрый черновик",
+      "description": "Меньше шагов, удобно быстро проверять промпт.",
+      "settings": {
+        "workflowType": "sd15-text2img",
+        "width": 512,
+        "height": 512,
+        "steps": 12,
+        "cfg": 6,
+        "batchSize": 1,
+        "seed": -1
+      }
+    },
+    {
+      "id": "balanced-square",
+      "name": "Сбалансированная 1:1",
+      "description": "Обычный универсальный режим.",
+      "settings": {
+        "workflowType": "sd15-text2img",
+        "width": 768,
+        "height": 768,
+        "steps": 25,
+        "cfg": 7,
+        "batchSize": 1,
+        "seed": -1
+      }
+    },
+    {
+      "id": "portrait",
+      "name": "Портрет",
+      "description": "Вертикальный кадр для персонажей и аватаров.",
+      "settings": {
+        "workflowType": "sd15-text2img",
+        "width": 640,
+        "height": 896,
+        "steps": 28,
+        "cfg": 7,
+        "batchSize": 1,
+        "seed": -1
+      }
+    },
+    {
+      "id": "wallpaper-16-9",
+      "name": "Wallpaper 16:9",
+      "description": "Горизонтальный кадр под обои или сцены.",
+      "settings": {
+        "workflowType": "sd15-text2img",
+        "width": 1024,
+        "height": 576,
+        "steps": 30,
+        "cfg": 7,
+        "batchSize": 1,
+        "seed": -1
+      }
+    }
+  ]
+}

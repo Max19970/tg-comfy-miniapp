@@ -1,0 +1,38 @@
+import { Plus, Settings2, Trash2 } from 'lucide-react';
+import { Field, Select } from './Field.jsx';
+import { numberValue } from '../state/defaultSettings.js';
+
+export function LoraEditor({ loras = [], resources, onChange }) {
+  function addLora() {
+    onChange([...loras, { name: resources.loras?.[0] || '', strengthModel: 0.75, strengthClip: 0.75 }]);
+  }
+
+  function updateLora(index, key, value) {
+    onChange(loras.map((lora, i) => i === index ? { ...lora, [key]: value } : lora));
+  }
+
+  function removeLora(index) {
+    onChange(loras.filter((_, i) => i !== index));
+  }
+
+  return (
+    <section className="loraBox">
+      <div className="sectionTitle"><Settings2 size={18} /><strong>LoRA</strong><button type="button" className="ghost" onClick={addLora}><Plus size={18} /> Добавить</button></div>
+      {!loras.length && <p className="muted">LoRA не подключены.</p>}
+      {loras.map((lora, index) => (
+        <div className="loraRow" key={index}>
+          <Field label="Файл LoRA">
+            <Select value={lora.name} options={resources.loras} onChange={(v) => updateLora(index, 'name', v)} placeholder="LoRA" />
+          </Field>
+          <Field label="Model">
+            <input type="number" step="0.05" value={lora.strengthModel} onChange={(e) => updateLora(index, 'strengthModel', numberValue(e.target.value))} />
+          </Field>
+          <Field label="CLIP">
+            <input type="number" step="0.05" value={lora.strengthClip} onChange={(e) => updateLora(index, 'strengthClip', numberValue(e.target.value))} />
+          </Field>
+          <button type="button" className="iconDanger" onClick={() => removeLora(index)} aria-label="Удалить LoRA"><Trash2 size={18} /></button>
+        </div>
+      ))}
+    </section>
+  );
+}
