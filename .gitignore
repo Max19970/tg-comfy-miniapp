@@ -1,0 +1,20 @@
+node_modules
+frontend/dist
+backend/data
+*.log
+.env
+.DS_Store
+config.local.yaml
+cloudflared/*.json
+
+# Local secrets / runtime config
+config.yaml
+cloudflared/config.yml
+
+# Runtime data
+backend/data
+frontend/dist
+node_modules
+*.log
+.env
+cloudflared/*.json

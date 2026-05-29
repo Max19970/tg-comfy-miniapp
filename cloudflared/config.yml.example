@@ -1,0 +1,13 @@
+# Cloudflare Named Tunnel example.
+# Replace tunnel and credentials-file after:
+#   cloudflared tunnel login
+#   cloudflared tunnel create tg-comfy-miniapp
+#   cloudflared tunnel route dns tg-comfy-miniapp your-bot.example.com
+
+tunnel: YOUR_TUNNEL_UUID
+credentials-file: /etc/cloudflared/YOUR_TUNNEL_UUID.json
+
+ingress:
+  - hostname: your-bot.example.com
+    service: http://127.0.0.1:8080
+  - service: http_status:404

@@ -1,0 +1,25 @@
+services:
+  tg-comfy-miniapp:
+    build: .
+    container_name: tg-comfy-miniapp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./backend/data:/app/backend/data
+    # If ComfyUI runs on the Docker host, keep this and set comfy.httpUrl to http://host.docker.internal:8188
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Optional: run cloudflared in the same compose stack.
+  # Use cloudflared/config.docker.yml.example as cloudflared/config.yml and put credentials JSON nearby.
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: tg-comfy-cloudflared
+  #   restart: unless-stopped
+  #   command: tunnel --config /etc/cloudflared/config.yml run
+  #   volumes:
+  #     - ./cloudflared:/etc/cloudflared:ro
+  #   depends_on:
+  #     - tg-comfy-miniapp

@@ -1,0 +1,68 @@
+# Copy this file to config.yaml and fill real values.
+server:
+  host: 0.0.0.0
+  port: 8080
+  # Public HTTPS URL that Cloudflare Named Tunnel points to this app.
+  # Mini App will be opened from this URL and will call backend on the same origin.
+  publicBaseUrl: https://your-bot.example.com
+  # Usually the same as publicBaseUrl. You can set a custom path/page if needed.
+  miniAppUrl: https://your-bot.example.com
+  # Path where Vite puts production frontend bundle.
+  frontendDist: ./frontend/dist
+
+telegram:
+  botToken: "PUT_TELEGRAM_BOT_TOKEN_HERE"
+  # Put any long random string here; it is sent by Telegram in X-Telegram-Bot-Api-Secret-Token.
+  webhookSecret: "CHANGE_ME_TO_A_RANDOM_SECRET"
+  # When true, backend validates Telegram initData for all API calls.
+  enforceAuth: true
+  # Optional allow-list. Leave empty to allow any Telegram user who opens the Mini App.
+  allowedUserIds: []
+  authTtlSeconds: 86400
+
+comfy:
+  httpUrl: http://127.0.0.1:8188
+  wsUrl: ws://127.0.0.1:8188/ws
+  workflowFile: ./workflows/sd15-basic.json
+  requestTimeoutMs: 120000
+  # Fallback values used if /object_info is unavailable.
+  fallback:
+    checkpoints:
+      - v1-5-pruned-emaonly.safetensors
+    loras: []
+    samplers:
+      - euler
+      - euler_ancestral
+      - dpmpp_2m
+      - dpmpp_sde
+      - ddim
+    schedulers:
+      - normal
+      - karras
+      - exponential
+      - simple
+
+storage:
+  dataDir: ./backend/data
+  maxHistoryPerUser: 200
+
+# Optional Cloudflare Named Tunnel integration.
+# When autoStart is true, npm start also runs cloudflared and stops it on shutdown.
+cloudflare:
+  autoStart: false
+  # Use "cloudflared" if it is in PATH, or set a full path on Windows, for example:
+  # executable: C:\Programs\cloudflared\cloudflared.exe
+  executable: cloudflared
+  # Locally-managed named tunnel config. Relative paths are resolved from this config.yaml file.
+  configFile: ./cloudflared/config.yml
+  tunnelName: tg-comfy-miniapp
+  hostname: your-bot.example.com
+  logLevel: info
+  # Restart cloudflared if it crashes while backend is still running.
+  restartOnExit: true
+  restartDelayMs: 5000
+  # For remotely-managed tunnels you may use token instead of configFile/tunnelName.
+  # Prefer env:CLOUDFLARED_TOKEN so the token is not stored in the file.
+  # token: env:CLOUDFLARED_TOKEN
+  extraArgsBeforeRun: []
+  extraArgsAfterRun: []
