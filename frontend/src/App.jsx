@@ -20,6 +20,13 @@ function loadSavedSettings() {
   }
 }
 
+function getStudioSummary(settings) {
+  const size = `${settings.width || '?'}×${settings.height || '?'}`;
+  const sampler = settings.samplerName || 'sampler';
+  const model = settings.checkpoint || settings.workflowType || 'model';
+  return `${size} · ${settings.steps || '?'} steps · ${sampler} · ${model}`;
+}
+
 export function App() {
   const { tg, initData } = useTelegram();
   const api = React.useMemo(() => createApiClient(initData), [initData]);
@@ -29,6 +36,7 @@ export function App() {
   const [resources, setResources] = React.useState({ checkpoints: [], loras: [], samplers: [], schedulers: [] });
   const [presets, setPresets] = React.useState([]);
   const [job, setJob] = React.useState(null);
+  const [preview, setPreview] = React.useState(null);
   const [history, setHistory] = React.useState([]);
   const [filters, setFilters] = React.useState({ search: '', status: '', favorite: false });
   const [loading, setLoading] = React.useState(true);
@@ -44,10 +52,12 @@ export function App() {
   const { connect } = useJobSocket({
     initData,
     onError: setError,
+    onPreview: setPreview,
     onJob: (nextJob) => {
       setJob(nextJob);
       if (['done', 'failed', 'cancelled'].includes(nextJob.status)) {
         setBusy(false);
+        setPreview(null);
         loadHistory(filters).catch(() => {});
       }
     }
@@ -117,11 +127,14 @@ export function App() {
     e.preventDefault();
     try {
       setError('');
+      setPreview(null);
       setBusy(true);
+      setTab('generate');
       const data = await api.generate(settings);
       setJob(data.job);
       connect(data.job.id);
       tg?.HapticFeedback?.impactOccurred?.('medium');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
       setBusy(false);
       setError(e.message || String(e));
@@ -131,6 +144,7 @@ export function App() {
   async function cancelJob(id) {
     try {
       setError('');
+      setPreview(null);
       const data = await api.cancelJob(id);
       setJob(data.job);
       await loadHistory(filters);
@@ -156,43 +170,60 @@ export function App() {
   }
 
   if (loading) {
-    return <main className="app"><div className="center"><Loader2 className="spin" /> Загружаю mini app…</div></main>;
+    return <main className="app"><div className="center"><Loader2 className="spin" /> Открываю студию…</div></main>;
   }
 
   return (
     <main className="app">
-      <header className="hero">
+      <header className="topBar">
         <div>
-          <p className="eyebrow">Telegram Mini App + ComfyUI</p>
-          <h1>Генератор картинок</h1>
+          <p className="eyebrow">ComfyUI studio</p>
+          <h1>Image Lab</h1>
+          <span className="studioSummary">{getStudioSummary(settings)}</span>
         </div>
-        <button className="ghost" onClick={() => { loadHistory(filters); tg?.HapticFeedback?.selectionChanged?.(); }}><RefreshCw size={18} /></button>
+        <button className="ghost iconButton" onClick={() => { loadHistory(filters); tg?.HapticFeedback?.selectionChanged?.(); }} aria-label="Обновить историю">
+          <RefreshCw size={18} />
+        </button>
       </header>
 
-      {!initData && <div className="notice">Открывай приложение из Telegram-бота. Без Telegram initData сервер не пустит API-запросы, если включена проверка.</div>}
+      {!initData && <div className="notice">Открой приложение из Telegram-бота. Без Telegram initData сервер может не пустить API-запросы.</div>}
       {resources.warning && <div className="notice">{resources.warning}</div>}
       {error && <div className="notice error">{error}</div>}
 
       <nav className="tabs">
-        <button className={tab === 'generate' ? 'active' : ''} onClick={() => setTab('generate')}><Wand2 size={18} /> Генерация</button>
-        <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}><History size={18} /> История</button>
+        <button className={tab === 'generate' ? 'active' : ''} onClick={() => setTab('generate')}><Wand2 size={18} /> Студия</button>
+        <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}><History size={18} /> Галерея</button>
       </nav>
 
       {tab === 'generate' && (
-        <GenerateForm
-          settings={settings}
-          resources={resources}
-          presets={presets}
-          busy={busy}
-          onSubmit={generate}
-          onPatch={patch}
-          onUsePreset={usePreset}
-          onRefreshResources={refreshResources}
-        />
-      )}
+        <>
+          {job ? (
+            <ProgressPanel job={job} preview={preview} onCancel={cancelJob} />
+          ) : (
+            <section className="stagePanel idle">
+              <div className="stageFrame">
+                <div className="stageEmpty">
+                  <span>Здесь появится результат</span>
+                  <small>Опиши кадр ниже и запусти генерацию</small>
+                </div>
+              </div>
+            </section>
+          )}
 
-      {tab === 'generate' && <ProgressPanel job={job} onCancel={cancelJob} />}
-      {tab === 'generate' && <ImageGrid images={job?.images || []} initData={initData} />}
+          <ImageGrid images={job?.images || []} initData={initData} variant="result" />
+
+          <GenerateForm
+            settings={settings}
+            resources={resources}
+            presets={presets}
+            busy={busy}
+            onSubmit={generate}
+            onPatch={patch}
+            onUsePreset={usePreset}
+            onRefreshResources={refreshResources}
+          />
+        </>
+      )}
 
       {tab === 'history' && (
         <HistoryList
