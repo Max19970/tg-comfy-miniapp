@@ -1,6 +1,24 @@
+import React from 'react';
 import { Copy, RefreshCw, Settings2, Shuffle, Star } from 'lucide-react';
 import { ImageGrid } from './ImageGrid.jsx';
 import { variationSettings } from '../state/defaultSettings.js';
+
+const galleryViewKey = 'tg-comfy-miniapp:gallery-view-mode';
+const galleryModes = [
+  { id: 'large', label: 'Большие', columns: 1 },
+  { id: 'medium', label: '2', columns: 2 },
+  { id: 'small', label: '3', columns: 3 },
+  { id: 'micro', label: '4', columns: 4 }
+];
+
+function loadGalleryViewMode() {
+  try {
+    const saved = localStorage.getItem(galleryViewKey);
+    return galleryModes.some((mode) => mode.id === saved) ? saved : 'large';
+  } catch {
+    return 'large';
+  }
+}
 
 function formatDate(value) {
   if (!value) return '';
@@ -18,6 +36,17 @@ function statusLabel(status) {
 }
 
 export function HistoryList({ history, initData, filters, onFiltersChange, onRefresh, onShowParams, onUseSettings, onToggleFavorite }) {
+  const [viewMode, setViewMode] = React.useState(loadGalleryViewMode);
+
+  function changeViewMode(nextMode) {
+    setViewMode(nextMode);
+    try {
+      localStorage.setItem(galleryViewKey, nextMode);
+    } catch {
+      // localStorage can be unavailable in some embedded contexts.
+    }
+  }
+
   return (
     <section className="historyList">
       <div className="galleryHeader">
@@ -37,11 +66,25 @@ export function HistoryList({ history, initData, filters, onFiltersChange, onRef
           <option value="cancelled">Отменённые</option>
         </select>
         <button className={filters.favorite ? 'secondary activeSoft' : 'secondary'} onClick={() => onFiltersChange({ ...filters, favorite: !filters.favorite })} type="button"><Star size={16} /> Избранное</button>
+
+        <div className="viewSwitch" role="group" aria-label="Размер карточек галереи">
+          {galleryModes.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              className={viewMode === mode.id ? 'active' : ''}
+              onClick={() => changeViewMode(mode.id)}
+              aria-label={`${mode.columns} ${mode.columns === 1 ? 'столбец' : 'столбца'}`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {!history.length && <div className="panel muted emptyHistory">Здесь будут твои генерации.</div>}
 
-      <div className="historyGrid">
+      <div className={`historyGrid ${viewMode}`}>
         {history.map((item) => (
           <article className="historyItem" key={item.id}>
             <ImageGrid images={item.images || []} initData={initData} variant="history" />
