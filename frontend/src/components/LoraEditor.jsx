@@ -2,7 +2,7 @@ import { Plus, Settings2, Trash2 } from 'lucide-react';
 import { Field, Select } from './Field.jsx';
 import { numberValue } from '../state/defaultSettings.js';
 
-export function LoraEditor({ loras = [], resources, onChange }) {
+export function LoraEditor({ loras = [], resources, onChange, compact = false }) {
   function addLora() {
     onChange([...loras, { name: resources.loras?.[0] || '', strengthModel: 0.75, strengthClip: 0.75 }]);
   }
@@ -16,9 +16,9 @@ export function LoraEditor({ loras = [], resources, onChange }) {
   }
 
   return (
-    <section className="loraBox">
+    <section className={compact ? 'loraBox compact' : 'loraBox'}>
       <div className="sectionTitle">
-        <span><Settings2 size={18} /><strong>LoRA</strong></span>
+        {!compact && <span><Settings2 size={18} /><strong>LoRA</strong></span>}
         <button type="button" className="ghost smallButton" onClick={addLora}><Plus size={18} /> Добавить</button>
       </div>
 
