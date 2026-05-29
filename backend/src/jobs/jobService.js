@@ -4,8 +4,76 @@ import { parseHistoryImages } from '../comfy/images.js';
 import { asPositiveInt } from '../utils/numbers.js';
 import { httpError } from '../utils/errors.js';
 
+const COMFY_BINARY_EVENTS = {
+  PREVIEW_IMAGE: 1,
+  PREVIEW_IMAGE_WITH_METADATA: 4
+};
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function getNodeDisplayName(workflow, nodeId) {
+  if (!nodeId) return null;
+
+  const id = String(nodeId);
+  const node = workflow?.[id];
+  if (!node) return `Node ${id}`;
+
+  if (node._meta?.title) return node._meta.title;
+
+  const friendly = {
+    CheckpointLoaderSimple: 'Загрузка модели',
+    CLIPTextEncode: 'Кодирование промпта',
+    EmptyLatentImage: 'Создание latent',
+    KSampler: 'Сэмплинг',
+    VAEDecode: 'VAE Decode',
+    SaveImage: 'Сохранение изображения',
+    LoraLoader: node.inputs?.lora_name ? `LoRA: ${node.inputs.lora_name}` : 'LoRA'
+  };
+
+  return friendly[node.class_type] || node.class_type || `Node ${id}`;
+}
+
+function parseComfyPreview(data) {
+  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  if (buffer.length < 8) return null;
+
+  const eventType = buffer.readUInt32BE(0);
+
+  if (eventType === COMFY_BINARY_EVENTS.PREVIEW_IMAGE) {
+    const imageType = buffer.readUInt32BE(4);
+    const mimeType = imageType === 2 ? 'image/png' : 'image/jpeg';
+    const imageBytes = buffer.subarray(8);
+    if (!imageBytes.length) return null;
+
+    return {
+      mimeType,
+      dataUrl: `data:${mimeType};base64,${imageBytes.toString('base64')}`
+    };
+  }
+
+  if (eventType === COMFY_BINARY_EVENTS.PREVIEW_IMAGE_WITH_METADATA) {
+    const metadataLength = buffer.readUInt32BE(4);
+    const imageStart = 8 + metadataLength;
+    if (metadataLength < 0 || buffer.length <= imageStart) return null;
+
+    let metadata = {};
+    try {
+      metadata = JSON.parse(buffer.subarray(8, imageStart).toString('utf8'));
+    } catch {}
+
+    const mimeType = metadata.image_type || 'image/jpeg';
+    const imageBytes = buffer.subarray(imageStart);
+    if (!imageBytes.length) return null;
+
+    return {
+      mimeType,
+      dataUrl: `data:${mimeType};base64,${imageBytes.toString('base64')}`
+    };
+  }
+
+  return null;
 }
 
 export function publicJob(job, queuePosition = null) {
@@ -16,6 +84,7 @@ export function publicJob(job, queuePosition = null) {
     progress: job.progress || 0,
     queuePosition: queuePosition ?? job.queuePosition ?? null,
     currentNode: job.currentNode || null,
+    currentNodeName: job.currentNodeName || null,
     promptId: job.promptId,
     settings: job.settings,
     images: job.images || [],
@@ -94,6 +163,16 @@ export class JobService {
     this.wsHub?.broadcast(job.id, { type: 'job', job: publicJob(job, this.getQueuePosition(job.id)) });
   }
 
+  broadcastPreview(jobId, preview) {
+    this.wsHub?.broadcast(jobId, {
+      type: 'preview',
+      preview: {
+        ...preview,
+        updatedAt: nowIso()
+      }
+    });
+  }
+
   broadcastQueuePositions() {
     for (const job of this.queue) this.broadcast(job);
   }
@@ -107,13 +186,14 @@ export class JobService {
     }
   }
 
-  async waitForComfyCompletion(job) {
+  async waitForComfyCompletion(job, workflow) {
     const wsUrl = this.comfyClient.webSocketUrl(job.clientId);
     await this.updateJob(job.id, { status: 'running', progress: 1 });
 
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(wsUrl);
       let settled = false;
+      let lastPreviewAt = 0;
       const keepAlive = setInterval(() => {
         if (socket.readyState === WebSocket.OPEN) socket.ping();
       }, 20000);
@@ -134,9 +214,20 @@ export class JobService {
         resolve();
       };
 
-      socket.on('message', async (data) => {
+      socket.on('message', async (data, isBinary) => {
         try {
           if (this.cancelled.has(job.id)) return finish();
+
+          if (isBinary) {
+            const preview = parseComfyPreview(data);
+            const now = Date.now();
+            if (preview && now - lastPreviewAt >= 300) {
+              lastPreviewAt = now;
+              this.broadcastPreview(job.id, preview);
+            }
+            return;
+          }
+
           if (typeof data !== 'string' && !Buffer.isBuffer(data)) return;
           const text = data.toString().trim();
           if (!text.startsWith('{')) return;
@@ -149,15 +240,24 @@ export class JobService {
             const value = Number(payload.value || 0);
             const max = Number(payload.max || 1);
             const percent = Math.max(1, Math.min(99, Math.round((value / max) * 100)));
-            await this.updateJob(job.id, { status: 'running', progress: percent, currentNode: payload.node || null });
+            await this.updateJob(job.id, {
+              status: 'running',
+              progress: percent,
+              currentNode: payload.node || null,
+              currentNodeName: getNodeDisplayName(workflow, payload.node)
+            });
           }
 
           if (type === 'executing') {
             if (payload.node === null && payload.prompt_id === job.promptId) {
-              await this.updateJob(job.id, { status: 'finalizing', progress: 99, currentNode: null });
+              await this.updateJob(job.id, { status: 'finalizing', progress: 99, currentNode: null, currentNodeName: null });
               finish();
             } else if (payload.node) {
-              await this.updateJob(job.id, { status: 'running', currentNode: String(payload.node) });
+              await this.updateJob(job.id, {
+                status: 'running',
+                currentNode: String(payload.node),
+                currentNodeName: getNodeDisplayName(workflow, payload.node)
+              });
             }
           }
 
@@ -184,7 +284,7 @@ export class JobService {
       const promptId = await this.comfyClient.submitPrompt({ workflow, clientId });
       job = await this.updateJob(job.id, { promptId, clientId, status: 'running', progress: 1 }, { flush: true });
 
-      await this.waitForComfyCompletion(job);
+      await this.waitForComfyCompletion(job, workflow);
       if (this.cancelled.has(job.id)) {
         await this.updateJob(job.id, { status: 'cancelled', progress: 0, cancelledAt: nowIso() }, { flush: true });
         return;
