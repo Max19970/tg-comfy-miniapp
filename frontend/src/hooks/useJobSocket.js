@@ -5,7 +5,7 @@ function wsUrl(jobId, initData) {
   return `${protocol}//${window.location.host}/api/ws?jobId=${encodeURIComponent(jobId)}&initData=${encodeURIComponent(initData)}`;
 }
 
-export function useJobSocket({ initData, onJob, onError }) {
+export function useJobSocket({ initData, onJob, onPreview, onError }) {
   const wsRef = React.useRef(null);
   const reconnectTimer = React.useRef(null);
   const currentJobId = React.useRef(null);
@@ -26,6 +26,7 @@ export function useJobSocket({ initData, onJob, onError }) {
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         if (message.type === 'job') onJob?.(message.job);
+        if (message.type === 'preview') onPreview?.(message.preview);
       };
 
       socket.onerror = () => onError?.('WebSocket прогресса отвалился. Генерация может продолжаться на сервере.');
@@ -37,7 +38,7 @@ export function useJobSocket({ initData, onJob, onError }) {
     };
 
     open();
-  }, [initData, onError, onJob]);
+  }, [initData, onError, onJob, onPreview]);
 
   const disconnect = React.useCallback(() => {
     currentJobId.current = null;
